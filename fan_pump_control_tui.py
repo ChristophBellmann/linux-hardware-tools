@@ -6,6 +6,7 @@ from typing import Optional
 
 HWMON_DIR = "/sys/class/hwmon/hwmon2"  # nct6798
 CHANNELS = [1, 2, 5]  # typische Zuordnung: CPU / Case / Pumpe
+UPDATE_INTERVAL = 0.25  # Sekunden, ca. 4x pro Sekunde
 
 
 def read_int(path: str) -> Optional[int]:
@@ -65,14 +66,16 @@ def main(stdscr):
         key = stdscr.getch()
         if key in (ord("q"), ord("Q")):
             break
-        # Tab: nächster Kanal (nutze nur den Tab-Zeichencode, da KEY_TAB
-        # auf manchen Systemen nicht definiert ist)
+        # Tab oder Cursor hoch/runter: Kanal wechseln
         elif key == 9:
             selected_idx = (selected_idx + 1) % len(CHANNELS)
-        # Shift+Tab (wenn verfügbar) oder ESC-[Z Sequenz wäre komplexer,
-        # daher hier nur KEY_BTAB, wenn curses ihn definiert.
         elif hasattr(curses, "KEY_BTAB") and key == curses.KEY_BTAB:
             selected_idx = (selected_idx - 1) % len(CHANNELS)
+        elif key == curses.KEY_UP:
+            selected_idx = (selected_idx - 1) % len(CHANNELS)
+        elif key == curses.KEY_DOWN:
+            selected_idx = (selected_idx + 1) % len(CHANNELS)
+        # Links/Rechts bzw. - / +: PWM-Wert ändern
         elif key in (curses.KEY_LEFT, ord("-")):
             ch = CHANNELS[selected_idx]
             pv = read_int(pwm_path(ch)) or 0
@@ -93,26 +96,6 @@ def main(stdscr):
                     last_msg = f"Fehler beim Schreiben auf pwm{ch} (Rechte?)"
             else:
                 last_msg = "Keine root-Rechte: PWM-Änderungen werden ignoriert."
-        elif key == curses.KEY_UP:
-            ch = CHANNELS[selected_idx]
-            pv = read_int(pwm_path(ch)) or 0
-            if is_root:
-                ok_en = write_int(pwm_enable_path(ch), 1)
-                ok_pwm = write_int(pwm_path(ch), clamp(pv + 32, 0, 255))
-                if not (ok_en and ok_pwm):
-                    last_msg = f"Fehler beim Schreiben auf pwm{ch} (Rechte?)"
-            else:
-                last_msg = "Keine root-Rechte: PWM-Änderungen werden ignoriert."
-        elif key == curses.KEY_DOWN:
-            ch = CHANNELS[selected_idx]
-            pv = read_int(pwm_path(ch)) or 0
-            if is_root:
-                ok_en = write_int(pwm_enable_path(ch), 1)
-                ok_pwm = write_int(pwm_path(ch), clamp(pv - 32, 0, 255))
-                if not (ok_en and ok_pwm):
-                    last_msg = f"Fehler beim Schreiben auf pwm{ch} (Rechte?)"
-            else:
-                last_msg = "Keine root-Rechte: PWM-Änderungen werden ignoriert."
         elif key in (ord("a"), ord("A")):
             # Auto/Manuell umschalten
             ch = CHANNELS[selected_idx]
@@ -129,7 +112,7 @@ def main(stdscr):
                 last_msg = "Keine root-Rechte: Mode-Änderungen werden ignoriert."
 
         now = time.time()
-        if now - last_update < 1.0:
+        if now - last_update < UPDATE_INTERVAL:
             continue
         last_update = now
 
@@ -137,8 +120,8 @@ def main(stdscr):
         stdscr.addstr(0, 0, "Fan/Pumpen-Steuerung (nct6798 hwmon2)")
         mode_str = "root (Schreiben erlaubt)" if is_root else "nicht-root (nur Lesen, keine PWM-Änderung)"
         stdscr.addstr(1, 0, f"Modus: {mode_str}")
-        stdscr.addstr(2, 0, "q: Quit  TAB: Kanal wechseln  ←/→/-/+: PWM  ↑/↓: grob  a: Auto/Manuell")
-        stdscr.addstr(3, 0, "Anzeige aktualisiert sich etwa einmal pro Sekunde.")
+        stdscr.addstr(2, 0, "q: Quit  ↑/↓/TAB: Kanal wählen  ←/→/-/+: PWM  a: Auto/Manuell")
+        stdscr.addstr(3, 0, "Anzeige aktualisiert sich etwa viermal pro Sekunde.")
 
         if last_msg:
             stdscr.addstr(4, 0, f"Status: {last_msg}")
