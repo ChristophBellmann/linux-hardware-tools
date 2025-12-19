@@ -1,0 +1,25 @@
+  description: >
+    specs of my computer -> christoph-produktion
+
+specs:
+  cpu: "AMD Ryzen 9 3900X"
+    cpu_fetch: 'lscpu |grep Modellname:'
+    cpu_clock: 'grep \"cpu MHz\" /proc/cpuinfo | head'
+  gpu: "AMD Radeon RX 6700 XT"
+    gpu_fetch: 'sudo lshw -C display |grep Produkt:'
+  mainboard: "ROG STRIX B550-I GAMING"
+    mainboard_fetch: 'sudo dmidecode -t baseboard |grep "Product Name:"'
+  ram: "CMK32GX4M2A2400C14"
+    ram_fetch: 'sudo dmidecode -t memory |grep "Part Number:"'
+  drives:
+    type: "ssd""
+        root "/dev/sda3"
+    type: "nvme"
+        moar_space: "/dev/nvme1n1p1"
+        some_space: "/dev/nvme1n1p2"
+        windows:    "/dev/nvme0n1p2"
+    swap: 
+        size: 48g       
+        location: "on some_space"        
+  os: Linux mint
+    os_ftech: inxi -Sxxx
